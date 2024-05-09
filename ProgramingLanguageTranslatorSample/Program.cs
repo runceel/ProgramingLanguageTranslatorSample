@@ -80,24 +80,20 @@ async Task ConvertAsync(string targetFileName, string outputFolderPath)
 
             1. Check the "Source programming language" to understand what the original programming language is.
             2. Check the "Destination programming language" to understand what the target programming language is.
-            3. "Code prior to the code to be converted" contains code that is before the code to be converted. This code is provided only as reference information and should not be converted. Refer to it when converting the "Code to be converted".
-            4. "Code to be converted" contains the code to be converted. This code may be a part of a larger code. Convert only this code to the target programming language. When converting, do not add extra code or modify the original code.
-            5. Based on the contents from 1 to 4, convert the "Code to be converted" to the target programming language.
-            6. Review the converted code from the following perspectives and correct any issues.
+            3. "Code to be converted" contains the code to be converted. This code may be a part of a larger code. Convert only this code to the target programming language. When converting, do not add extra code or modify the original code.
+            4. Based on the contents from 1 to 4, convert the "Code to be converted" to the target programming language.
+            5. Review the converted code from the following perspectives and correct any issues.
                 - Since "Code to be converted" may be a part of a larger code, check if any inappropriate closing brackets have been added or if the original code has been modified.
                 - Do not include conversations in the converted code, only output the code in the target programming language.
                 - If there is any extra code added to eliminate compile errors from the converted code, remove it.
                 - Finally, check if the converted code has been properly converted to correspond one-to-one with the original code.
-            7. After careful consideration, if you determine there are no issues, submit the converted source code.
+            6. After careful consideration, if you determine there are no issues, submit the converted source code.
 
             ### Source programming language
             {{{options.SourceLanguage}}}
 
             ### Destination programming language
             {{{options.DestinationLanguage}}}
-
-            ### Code prior to the code to be converted
-            {{{string.Join('\n', chunk.PrevSourceLines)}}}
 
             ### Code to be converted
             {{{string.Join('\n', chunk.TargetSourceLines)}}}
