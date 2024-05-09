@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ProgramingLanguageTranslatorSample": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
