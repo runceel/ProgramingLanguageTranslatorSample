@@ -10,10 +10,8 @@ namespace ProgramingLanguageTranslatorSample.SourceReaders;
 
 public interface ISourceReader
 {
-    IAsyncEnumerable<SourceCodeChunk> ReadAsync(
+    public IAsyncEnumerable<SourceCodeChunk> ReadAsync(
         string fileName,
-        int maxPrevSourceToken,
-        int maxTargetSourceToken,
         CancellationToken cancellationToken = default);
 }
 
@@ -22,47 +20,52 @@ internal class DefaultSourceReader : ISourceReader
     private static Tokenizer _tokenizer = Tokenizer.CreateTiktokenForModel("gpt-35-turbo");
     public async IAsyncEnumerable<SourceCodeChunk> ReadAsync(
         string fileName, 
-        int maxPrevSourceToken, 
-        int maxTargetSourceToken,
         [EnumeratorCancellation]
         CancellationToken cancellationToken = default)
     {
         using var sr = new StreamReader(File.OpenRead(fileName));
-        var prevSourceLines = new List<string>();
-        var targetSourceLines = new List<string>();
 
-        int currentTargetSourceToken = 0;
-        while(!sr.EndOfStream)
+        string[]? prevChunk = null;
+        string[]? currentChunk = null;
+        await foreach (var nextChunk in ReadLinesAsync(sr, 100))
         {
-            var line = await sr.ReadLineAsync(cancellationToken);
-            var currentLineToken = _tokenizer.CountTokens(line!);
-            if (currentTargetSourceToken + currentLineToken > maxTargetSourceToken)
+            if (currentChunk != null)
             {
-                yield return new SourceCodeChunk(fileName, prevSourceLines.ToArray(), targetSourceLines.ToArray());
-                prevSourceLines.AddRange(targetSourceLines);
-
-                currentTargetSourceToken = 0;
-                targetSourceLines.Clear();
-
-                var tokensForPrevSourceLines = 0;
-                prevSourceLines = prevSourceLines
-                    .Reverse<string>()
-                    .TakeWhile(x => (tokensForPrevSourceLines += _tokenizer.CountTokens(x)) < maxPrevSourceToken)
-                    .Reverse()
-                    .ToList();
+                yield return new SourceCodeChunk(fileName, prevChunk ?? [], currentChunk, nextChunk);
             }
 
-            currentTargetSourceToken += currentLineToken;
-            targetSourceLines.Add(line!);
+            prevChunk = currentChunk;
+            currentChunk = nextChunk;
         }
 
-        if (targetSourceLines.Any())
+        if (currentChunk != null)
         {
-            yield return new SourceCodeChunk(fileName, prevSourceLines.ToArray(), targetSourceLines.ToArray());
+            yield return new SourceCodeChunk(fileName, prevChunk ?? [], currentChunk, []);
+        }
+    }
+
+    private async IAsyncEnumerable<string[]> ReadLinesAsync(StreamReader sr, int chunkSize)
+    {
+        var list = new List<string>();
+        while (!sr.EndOfStream)
+        {
+            var line = await sr.ReadLineAsync();
+            list.Add(line!);
+            if (list.Count >= chunkSize)
+            {
+                yield return list.ToArray();
+                list.Clear();
+            }
+        }
+
+        if (list.Any())
+        {
+            yield return list.ToArray();
         }
     }
 }
 
 public record SourceCodeChunk(string FileName,
-    string[] PrevSourceLines,
-    string[] TargetSourceLines);
+    string[] PrevChunk,
+    string[] CurrentChunk,
+    string[] NextChunk);
