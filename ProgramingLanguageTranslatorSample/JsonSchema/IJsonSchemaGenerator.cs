@@ -1,9 +1,5 @@
 ﻿using NJsonSchema.Generation;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace ProgramingLanguageTranslatorSample.JsonSchema;
 public interface IJsonSchemaGenerator
@@ -14,7 +10,13 @@ public interface IJsonSchemaGenerator
 
 public class DefaultJsonSchemaGenerator : IJsonSchemaGenerator
 {
-    private readonly JsonSchemaGeneratorSettings _settings = new SystemTextJsonSchemaGeneratorSettings();
+    private readonly JsonSchemaGeneratorSettings _settings = new SystemTextJsonSchemaGeneratorSettings
+    {
+        SerializerOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        },
+    };
     
     public string GenerateFromType(Type type)
     {

@@ -8,7 +8,6 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using ProgramingLanguageTranslatorSample.JsonSchema;
-using ProgramingLanguageTranslatorSample.Memories;
 using ProgramingLanguageTranslatorSample.Options;
 using ProgramingLanguageTranslatorSample.SourceReaders;
 
@@ -17,10 +16,6 @@ internal static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddProgramingLanguageTranslatorServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<ConverterOption>()
-           .BindConfiguration(nameof(ConverterOption))
-           .ValidateDataAnnotations();
-
         services.AddAzureClients(clientBuilder =>
         {
             clientBuilder.AddOpenAIClient(configuration.GetSection(nameof(OpenAIClient)));
@@ -32,31 +27,21 @@ internal static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<IOptions<ConverterOption>>().Value;
             var openAiClient = sp.GetRequiredService<OpenAIClient>();
             return new AzureOpenAIChatCompletionService(
-                options.ModelDeploymentNameForAnalyzeContext,
-                openAiClient,
-                modelId: ModelIds.AnalyzeSourceCode);
-        });
-        services.AddSingleton<IChatCompletionService>(sp =>
-        {
-            var options = sp.GetRequiredService<IOptions<ConverterOption>>().Value;
-            var openAiClient = sp.GetRequiredService<OpenAIClient>();
-            return new AzureOpenAIChatCompletionService(
                 options.ModelDeploymentNameForConvertSourceCode,
-                openAiClient,
-                modelId: ModelIds.ConvertSourceCode);
+                openAiClient);
         });
 
         services.AddKernel();
 
+        services.AddOptions<ConverterOption>()
+           .BindConfiguration(nameof(ConverterOption))
+           .ValidateDataAnnotations();
+
         // application services
         services.AddSingleton<ISourceReader, DefaultSourceReader>();
         services.AddSingleton<IJsonSchemaGenerator, DefaultJsonSchemaGenerator>();
+        services.AddSingleton<IVBtoCSConverter, DefaultVBtoCSConverter>();
 
-        // plugins
-        services.AddSingleton<MemoryPlugin>();
-        services.AddSingleton(sp => KernelPluginFactory.CreateFromObject(sp.GetRequiredService<MemoryPlugin>()));
-        services.AddSingleton<ConverterPlugin>();
-        services.AddSingleton(sp => KernelPluginFactory.CreateFromObject(sp.GetRequiredService<ConverterPlugin>()));
         return services;
     }
 }

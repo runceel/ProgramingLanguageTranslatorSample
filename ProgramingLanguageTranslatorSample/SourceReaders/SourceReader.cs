@@ -1,10 +1,4 @@
-﻿using Microsoft.ML.Tokenizers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.CompilerServices;
 
 namespace ProgramingLanguageTranslatorSample.SourceReaders;
 
@@ -12,14 +6,15 @@ public interface ISourceReader
 {
     public IAsyncEnumerable<SourceCodeChunk> ReadAsync(
         string fileName,
+        int chunkBlockSize,
         CancellationToken cancellationToken = default);
 }
 
 internal class DefaultSourceReader : ISourceReader
 {
-    private static Tokenizer _tokenizer = Tokenizer.CreateTiktokenForModel("gpt-35-turbo");
     public async IAsyncEnumerable<SourceCodeChunk> ReadAsync(
         string fileName, 
+        int chunkBlockSize,
         [EnumeratorCancellation]
         CancellationToken cancellationToken = default)
     {
@@ -27,7 +22,7 @@ internal class DefaultSourceReader : ISourceReader
 
         string[]? prevChunk = null;
         string[]? currentChunk = null;
-        await foreach (var nextChunk in ReadLinesAsync(sr, 100))
+        await foreach (var nextChunk in ReadLinesAsync(sr, chunkBlockSize))
         {
             if (currentChunk != null)
             {
@@ -44,7 +39,7 @@ internal class DefaultSourceReader : ISourceReader
         }
     }
 
-    private async IAsyncEnumerable<string[]> ReadLinesAsync(StreamReader sr, int chunkSize)
+    private static async IAsyncEnumerable<string[]> ReadLinesAsync(StreamReader sr, int chunkSize)
     {
         var list = new List<string>();
         while (!sr.EndOfStream)
@@ -58,7 +53,7 @@ internal class DefaultSourceReader : ISourceReader
             }
         }
 
-        if (list.Any())
+        if (list.Count != 0)
         {
             yield return list.ToArray();
         }
