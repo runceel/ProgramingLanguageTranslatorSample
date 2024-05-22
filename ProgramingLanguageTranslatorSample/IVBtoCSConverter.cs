@@ -29,6 +29,9 @@ internal class DefaultVBtoCSConverter(
         WriteIndented = true,
     };
 
+    private const int ChunkSize = 50;
+    private const int OverlapSize = 10;
+
     private static readonly string[] _attentions =
     [
         "VB は C# と異なりクラスやメソッドの開始や終了が `{` と `}` で括られていません。`Sub`, `Class`, `Function` などのキーワードで関数が始まり、`End Sub`, `End Class`, `End Function` などのキーワードで終わります。そのため括弧の開始忘れや閉じ括弧忘れが無いように細心の注意を払ってください。",
@@ -71,7 +74,7 @@ internal class DefaultVBtoCSConverter(
 
         await using var sw = new StreamWriter(outputFilePath);
         string[] prevConverted = [];
-        await foreach (var chunk in sourceReader.ReadAsync(targetFileName, 100))
+        await foreach (var chunk in sourceReader.ReadAsync(targetFileName, ChunkSize))
         {
             Console.WriteLine($"Processing... {targetFileName}, chunk: {chunkIndex++}");
             prevConverted = await ProcessChunkAsync(chunk, kernel, sw, prevConverted, jsonSchemaGenerator);
@@ -90,10 +93,10 @@ internal class DefaultVBtoCSConverter(
     {
         var aiInput = new AIInput(
             chunk.FileName,
-            prevConverted,
-            chunk.PrevChunk,
+            prevConverted.Length < OverlapSize ? prevConverted : prevConverted[^OverlapSize..],
+            chunk.PrevChunk.Length < OverlapSize ? chunk.PrevChunk : chunk.PrevChunk[^OverlapSize..],
             chunk.CurrentChunk,
-            chunk.NextChunk);
+            chunk.NextChunk.Length < OverlapSize ? chunk.NextChunk : chunk.NextChunk[..OverlapSize]);
 
         var json = new StringBuilder();
         await foreach (var x in kernel.InvokeStreamingAsync(
@@ -102,7 +105,7 @@ internal class DefaultVBtoCSConverter(
             {
                 ["inputSchema"] = jsonSchemaGenerator.GenerateFromType<AIInput>(),
                 ["outputSchema"] = jsonSchemaGenerator.GenerateFromType<AIOutput>(),
-                ["attentions"] = string.Join('\n', s_attentions.Select(x => $"- {x}")),
+                ["attentions"] = string.Join('\n', _attentions.Select(x => $"- {x}")),
                 ["input"] = JsonSerializer.Serialize(aiInput, _jsonSerializerOptions)
             }))
         {
@@ -116,20 +119,28 @@ internal class DefaultVBtoCSConverter(
             }
         }
 
-        var result = JsonSerializer.Deserialize<AIOutput>(json.ToString(), _jsonSerializerOptions);
-        if (result != null)
+        try
         {
-            foreach (var line in result.CurrentChunk)
+            var result = JsonSerializer.Deserialize<AIOutput>(json.ToString(), _jsonSerializerOptions);
+            if (result != null)
             {
-                await sw.WriteLineAsync(line);
-            }
+                foreach (var line in result.CurrentChunk)
+                {
+                    await sw.WriteLineAsync(line);
+                }
 
-            return result.CurrentChunk;
+                return result.CurrentChunk;
+            }
+            else
+            {
+                logger.LogWarning("Error: AI Result is {json}.", json);
+                return [];
+            }
         }
-        else
+        catch (JsonException ex)
         {
-            logger.LogWarning("Error: AI Result is {json}.", json);
-            return [];
+            logger.LogError(ex, "Error: {json}", json);
+            throw;
         }
     }
 
