@@ -7,7 +7,9 @@ using ProgramingLanguageTranslatorSample.JsonSchema;
 using ProgramingLanguageTranslatorSample.Options;
 using ProgramingLanguageTranslatorSample.SourceReaders;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace ProgramingLanguageTranslatorSample;
 internal interface IVBtoCSConverter
@@ -27,6 +29,7 @@ internal class DefaultVBtoCSConverter(
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
+        Encoder = JavaScriptEncoder.Create([UnicodeRanges.All]),
     };
 
     private const int ChunkSize = 50;
