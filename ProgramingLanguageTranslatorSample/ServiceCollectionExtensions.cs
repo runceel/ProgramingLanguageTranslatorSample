@@ -7,6 +7,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Polly;
+using Polly.Retry;
 using ProgramingLanguageTranslatorSample.JsonSchema;
 using ProgramingLanguageTranslatorSample.Options;
 using ProgramingLanguageTranslatorSample.SourceReaders;
@@ -16,6 +18,17 @@ internal static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddProgramingLanguageTranslatorServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddResiliencePipeline("converter", builder =>
+        {
+            builder.AddRetry(new RetryStrategyOptions
+            {
+                BackoffType = DelayBackoffType.Exponential,
+                MaxRetryAttempts = 10,
+                Delay = TimeSpan.FromSeconds(5),
+                MaxDelay = TimeSpan.FromSeconds(30),
+            });
+        });
+
         services.AddAzureClients(clientBuilder =>
         {
             clientBuilder.AddOpenAIClient(configuration.GetSection(nameof(OpenAIClient)));

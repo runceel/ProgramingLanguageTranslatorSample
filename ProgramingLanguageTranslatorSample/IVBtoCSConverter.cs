@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Polly;
+using Polly.Registry;
 using ProgramingLanguageTranslatorSample.JsonSchema;
 using ProgramingLanguageTranslatorSample.Options;
 using ProgramingLanguageTranslatorSample.SourceReaders;
@@ -22,9 +24,12 @@ internal class DefaultVBtoCSConverter(
     Kernel kernel,
     ISourceReader sourceReader,
     IOptions<ConverterOption> options,
-    ILogger<DefaultVBtoCSConverter> logger)
+    ILogger<DefaultVBtoCSConverter> logger,
+    ResiliencePipelineProvider<string> resiliencePipelineProvider)
     : IVBtoCSConverter
 {
+    private readonly ResiliencePipeline _resiliencePipeline = resiliencePipelineProvider.GetPipeline("converter");
+
     private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -80,7 +85,8 @@ internal class DefaultVBtoCSConverter(
         await foreach (var chunk in sourceReader.ReadAsync(targetFileName, ChunkSize))
         {
             Console.WriteLine($"Processing... {targetFileName}, chunk: {chunkIndex++}");
-            prevConverted = await ProcessChunkAsync(chunk, kernel, sw, prevConverted, jsonSchemaGenerator);
+            prevConverted = await _resiliencePipeline.ExecuteAsync(
+                async _ => await ProcessChunkAsync(chunk, kernel, sw, prevConverted, jsonSchemaGenerator));
             await Task.Delay(500);
         }
 
@@ -119,6 +125,11 @@ internal class DefaultVBtoCSConverter(
                     chunk.FileName,
                     chat.Content);
                 json.Append(chat.Content);
+            } 
+            else
+            {
+                logger.LogWarning("Unexpected response: {response}", x.ToString());
+                throw new InvalidOperationException("Unexpected response.");
             }
         }
 
@@ -137,7 +148,7 @@ internal class DefaultVBtoCSConverter(
             else
             {
                 logger.LogWarning("Error: AI Result is {json}.", json);
-                return [];
+                throw new InvalidOperationException("Something went wrong.");
             }
         }
         catch (JsonException ex)
