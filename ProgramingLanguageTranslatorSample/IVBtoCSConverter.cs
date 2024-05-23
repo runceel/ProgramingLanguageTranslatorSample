@@ -193,6 +193,7 @@ internal class DefaultVBtoCSConverter(
             executionSettings: new OpenAIPromptExecutionSettings
             {
                 Temperature = 0,
+                MaxTokens = 4096,
 #pragma warning disable SKEXP0010
                 ResponseFormat = ChatCompletionsResponseFormat.JsonObject,
 #pragma warning restore SKEXP0010
